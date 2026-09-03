@@ -1,0 +1,93 @@
+version: '3.8'
+
+services:
+  # Instância de Persistência PostgreSQL 15
+  db:
+    image: postgres:15.6-alpine
+    container_name: portal_db_postgres
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    # user: "70001:70001" # Removido para facilitar teste local, reativar em prod
+    environment:
+      POSTGRES_DB: portal_alta_criticidade
+      POSTGRES_USER: admin_portal_service
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secure_dev_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    networks:
+      - network_aplicacao
+
+  # Instância de Cache e Tarpit Limit
+  redis:
+    image: redis:7.2-alpine
+    container_name: portal_redis_cache
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - network_aplicacao
+
+  # Fastify API (Fortaleza)
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    container_name: portal_fastify_backend
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: portal_alta_criticidade
+      DB_USER: admin_portal_service
+      DB_PASSWORD: ${DB_PASSWORD:-secure_dev_password}
+      REDIS_HOST: redis
+      ADMIN_HMAC_SECRET: ${ADMIN_HMAC_SECRET:-default_unsafe_secret_please_change_in_production_for_admin_portal}
+    networks:
+      - network_borda
+      - network_aplicacao
+    depends_on:
+      - db
+      - redis
+
+  # Servidor de Borda SPA (Tarpit Engine)
+  caddy:
+    image: caddy:2.7.6-alpine
+    container_name: portal_caddy_reverse
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - network_borda
+    depends_on:
+      - backend
+
+volumes:
+  pg_data:
+  redis_data:
+  caddy_data:
+  caddy_config:
+
+networks:
+  network_borda:
+    driver: bridge
+  network_aplicacao:
+    driver: bridge
+    internal: true # Isolamento total contra rede externa
