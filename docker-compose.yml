@@ -1,18 +1,17 @@
 version: '3.8'
 
 services:
-  # Instância de Persistência PostgreSQL 15
+  # Instância de Persistência PostgreSQL
   db:
     image: postgres:15.6-alpine
-    container_name: portal_db_postgres
+    container_name: portfolio_db
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
-    # user: "70001:70001" # Removido para facilitar teste local, reativar em prod
     environment:
-      POSTGRES_DB: portal_alta_criticidade
-      POSTGRES_USER: admin_portal_service
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-secure_dev_password}
+      POSTGRES_USER: ${PG_USER}
+      POSTGRES_PASSWORD: ${PG_PASS}
+      POSTGRES_DB: ${PG_DB}
     ports:
       - "5432:5432"
     volumes:
@@ -20,10 +19,10 @@ services:
     networks:
       - network_aplicacao
 
-  # Instância de Cache e Tarpit Limit
+  # Instância de Cache Redis
   redis:
     image: redis:7.2-alpine
-    container_name: portal_redis_cache
+    container_name: showcase_cache
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
@@ -34,25 +33,20 @@ services:
     networks:
       - network_aplicacao
 
-  # Fastify API (Fortaleza)
+  # Fastify API
   backend:
     build:
       context: .
       dockerfile: Dockerfile.prod
-    container_name: portal_fastify_backend
+    container_name: show_fastify_backend
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
+    env_file:
+      - .env
     environment:
-      NODE_ENV: production
-      PORT: 3000
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_NAME: portal_alta_criticidade
-      DB_USER: admin_portal_service
-      DB_PASSWORD: ${DB_PASSWORD:-secure_dev_password}
+      DATABASE_URL: postgres://${PG_USER}:${PG_PASS}@db:5432/${PG_DB}
       REDIS_HOST: redis
-      ADMIN_HMAC_SECRET: ${ADMIN_HMAC_SECRET:-default_unsafe_secret_please_change_in_production_for_admin_portal}
     networks:
       - network_borda
       - network_aplicacao
@@ -60,10 +54,10 @@ services:
       - db
       - redis
 
-  # Servidor de Borda SPA (Tarpit Engine)
+  # Servidor de Borda (Reverse Proxy)
   caddy:
     image: caddy:2.7.6-alpine
-    container_name: portal_caddy_reverse
+    container_name: show_caddy_reverse
     restart: unless-stopped
     ports:
       - "80:80"
@@ -90,4 +84,4 @@ networks:
     driver: bridge
   network_aplicacao:
     driver: bridge
-    internal: true # Isolamento total contra rede externa
+    internal: true
