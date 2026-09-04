@@ -14,7 +14,10 @@ import { config } from "./config";
 export const AppDataSource = new DataSource({
   type: "postgres",
   url: config.DATABASE_URL,
-  synchronize: config.NODE_ENV === "test",
+  // synchronize: true cria as tabelas automaticamente no primeiro deploy
+  synchronize: true,
+  // SSL obrigatório para bancos na nuvem (Neon / Supabase)
+  ssl: config.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
   logging: false,
   entities: [
     InteractionEntity,

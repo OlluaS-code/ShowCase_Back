@@ -20,6 +20,7 @@ export class AppConfig {
     public readonly REDIS_HOST: string,
     public readonly REDIS_PORT: number,
     public readonly APP_FRONTEND_URL: string,
+    public readonly REDIS_URL?: string,
     public readonly ADMIN_EMAIL?: string,
     public readonly ADMIN_PASSWORD?: string,
   ) {}
@@ -95,6 +96,7 @@ export class AppConfig {
       VALIDATION_DRY_RUN,
       REDIS_HOST,
       REDIS_PORT,
+      REDIS_URL,
       APP_FRONTEND_URL,
       ADMIN_EMAIL,
       ADMIN_PASSWORD,
@@ -128,6 +130,7 @@ export class AppConfig {
 
     const redisHost = REDIS_HOST ?? "localhost";
     const redisPort = AppConfig.parsePort(REDIS_PORT, 6379);
+    const redisUrl = REDIS_URL || undefined;
     
     // Fallback development URL if not set
     const frontendUrl = APP_FRONTEND_URL ?? "http://localhost:5500";
@@ -151,6 +154,7 @@ export class AppConfig {
       redisHost,
       redisPort,
       frontendUrl,
+      redisUrl,
       ADMIN_EMAIL,
       ADMIN_PASSWORD,
     );

@@ -1,30 +1,48 @@
+# ==========================================
+# Estágio 1: Build & Dependências Nativas
+# ==========================================
 FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# Copy dependency files
-COPY package*.json ./
-RUN npm install
+# Ferramentas de compilação essenciais para o módulo nativo argon2
+RUN apk add --no-cache python3 make g++
 
-# Copy source code
-COPY . .
-RUN npm run build
+# Copia manifestos de dependência para cache determinístico
+COPY package.json yarn.lock ./
 
-FROM node:22-alpine
+# Instala todas as dependências (incluindo devDependencies como typescript)
+RUN yarn install --frozen-lockfile
+
+# Copia arquivos de configuração e código-fonte
+COPY tsconfig.json ./
+COPY src/ ./src/
+
+# Compila o TypeScript para JavaScript puro em /app/dist
+RUN yarn build
+
+# Remove dependências de desenvolvimento mantendo apenas pacotes de produção
+RUN yarn install --production --frozen-lockfile --prefer-offline
+
+# ==========================================
+# Estágio 2: Imagem Final de Execução
+# ==========================================
+FROM node:22-alpine AS runner
 
 WORKDIR /app
 ENV NODE_ENV=production
 
-COPY package*.json ./
-RUN npm install --omit=dev
+# dumb-init gerencia sinais PID 1 (SIGTERM/SIGINT) para graceful shutdown
+# libc6-compat garante compatibilidade binária no Alpine
+RUN apk add --no-cache dumb-init libc6-compat
 
-COPY --from=builder /app/dist ./dist
+# Copia node_modules já enxutos e a pasta dist com permissão do usuário node
+COPY --from=builder --chown=node:node /app/node_modules ./node_modules
+COPY --from=builder --chown=node:node /app/dist ./dist
+COPY --from=builder --chown=node:node /app/package.json ./package.json
 
-# Non-root user
-RUN chown -R node:node /app
 USER node
 
 EXPOSE 3000
 
-# Use Dumb-init or just node. 
-CMD ["node", "dist/index.js"]
+CMD ["dumb-init", "node", "dist/index.js"]
