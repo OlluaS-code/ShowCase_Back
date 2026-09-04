@@ -1,48 +1,73 @@
 # ==========================================
-# Estágio 1: Build & Dependências Nativas
+# Estágio 1: Builder — compilação TypeScript + módulos nativos
 # ==========================================
 FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# Ferramentas de compilação essenciais para o módulo nativo argon2
+# Ferramentas de compilação para o módulo nativo argon2
 RUN apk add --no-cache python3 make g++
 
-# Copia manifestos de dependência para cache determinístico
+# Copia manifestos para cache determinístico de camadas
 COPY package.json yarn.lock ./
 
-# Instala todas as dependências (incluindo devDependencies como typescript)
+# Instala TODAS as dependências (dev + prod) para ter o TypeScript disponível
 RUN yarn install --frozen-lockfile
 
-# Copia arquivos de configuração e código-fonte
+# Copia configuração e código-fonte
 COPY tsconfig.json ./
 COPY src/ ./src/
 
-# Compila o TypeScript para JavaScript puro em /app/dist
+# Compila TypeScript → JavaScript em /app/dist
 RUN yarn build
 
-# Remove dependências de desenvolvimento mantendo apenas pacotes de produção
-RUN yarn install --production --frozen-lockfile --prefer-offline
+# ==========================================
+# Estágio 2: Prune — remove devDependencies mantendo binários nativos
+# ==========================================
+FROM node:22-alpine AS pruner
+
+WORKDIR /app
+
+# Mesmas ferramentas de compilação: necessárias para recompilar argon2
+# no mesmo ambiente Alpine (mesmo ABI/musl) sem devDependencies
+RUN apk add --no-cache python3 make g++
+
+COPY package.json yarn.lock ./
+
+# Instala apenas dependências de produção (sem devDeps)
+# --ignore-scripts evita re-execução de postinstall desnecessária
+RUN yarn install --frozen-lockfile --production --ignore-scripts
+
+# Recompila argon2 para garantir binário nativo correto neste Alpine
+RUN yarn rebuild argon2
 
 # ==========================================
-# Estágio 2: Imagem Final de Execução
+# Estágio 3: Runner — imagem final mínima de execução
 # ==========================================
 FROM node:22-alpine AS runner
 
 WORKDIR /app
+
+# NODE_ENV injetado aqui: elimina dependência do cross-env (devDependency)
 ENV NODE_ENV=production
 
-# dumb-init gerencia sinais PID 1 (SIGTERM/SIGINT) para graceful shutdown
-# libc6-compat garante compatibilidade binária no Alpine
+# dumb-init: gerencia PID 1 para SIGTERM/SIGINT chegar corretamente ao Node
+# libc6-compat: compatibilidade de ABI para módulos binários no Alpine
 RUN apk add --no-cache dumb-init libc6-compat
 
-# Copia node_modules já enxutos e a pasta dist com permissão do usuário node
-COPY --from=builder --chown=node:node /app/node_modules ./node_modules
-COPY --from=builder --chown=node:node /app/dist ./dist
+# Copia node_modules de produção (com argon2 nativo reconstruído)
+COPY --from=pruner  --chown=node:node /app/node_modules ./node_modules
+
+# Copia o dist compilado e o package.json (usado pelo Node para resolver paths)
+COPY --from=builder --chown=node:node /app/dist        ./dist
 COPY --from=builder --chown=node:node /app/package.json ./package.json
 
+# Executa como usuário não-root (segurança)
 USER node
 
+# Porta padrão do Fastify (configurável via env PORT)
 EXPOSE 3000
 
+# dumb-init → node: sem cross-env pois NODE_ENV já está no ENV acima
+# O bootstrap lê as variáveis injetadas pelo painel da Koyeb no runtime
 CMD ["dumb-init", "node", "dist/index.js"]
