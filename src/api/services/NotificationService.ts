@@ -1,4 +1,5 @@
 import { EventEmitter } from "events";
+import { config } from "../../utils/settings/config";
 import {
   NotificationMessages,
   NotificationType,
