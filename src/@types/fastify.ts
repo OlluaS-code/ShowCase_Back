@@ -2,7 +2,6 @@ import "fastify";
 import { AppConfig } from "../utils/settings/config";
 import { UserRole } from "../core/models/Enums";
 import type Redis from "ioredis";
-import type { SignedAdminURL } from "../api/hooks/admin-signature.hook";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -20,8 +19,6 @@ declare module "fastify" {
       scopes: string[];
       jti?: string;
     };
-    /** URL administrativa verificada pelo hook HMAC (admin-signature.hook) */
-    verifiedAdminUrl?: SignedAdminURL;
   }
 }
 
