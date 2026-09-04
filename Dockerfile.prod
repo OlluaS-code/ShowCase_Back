@@ -22,7 +22,7 @@ COPY src/ ./src/
 RUN yarn build
 
 # ==========================================
-# Estágio 2: Prune — remove devDependencies mantendo binários nativos
+# Estágio 2: Prune — instala só prod deps e recompila módulos nativos
 # ==========================================
 FROM node:22-alpine AS pruner
 
@@ -35,11 +35,8 @@ RUN apk add --no-cache python3 make g++
 COPY package.json yarn.lock ./
 
 # Instala apenas dependências de produção (sem devDeps)
-# --ignore-scripts evita re-execução de postinstall desnecessária
-RUN yarn install --frozen-lockfile --production --ignore-scripts
-
-# Recompila argon2 para garantir binário nativo correto neste Alpine
-RUN yarn rebuild argon2
+# Sem --ignore-scripts: o postinstall do argon2 compila o binário nativo automaticamente
+RUN yarn install --frozen-lockfile --production
 
 # ==========================================
 # Estágio 3: Runner — imagem final mínima de execução
@@ -59,7 +56,7 @@ RUN apk add --no-cache dumb-init libc6-compat
 COPY --from=pruner  --chown=node:node /app/node_modules ./node_modules
 
 # Copia o dist compilado e o package.json (usado pelo Node para resolver paths)
-COPY --from=builder --chown=node:node /app/dist        ./dist
+COPY --from=builder --chown=node:node /app/dist         ./dist
 COPY --from=builder --chown=node:node /app/package.json ./package.json
 
 # Executa como usuário não-root (segurança)
