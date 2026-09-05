@@ -18,12 +18,12 @@ async function bootstrap() {
 
     fastify.decorate("db", AppDataSource);
 
-    fastify.register(userRoutes, { prefix: "/api/users" });
-    fastify.register(publiRoutes, { prefix: "/api/publications" });
-    fastify.register(interactionRoutes, { prefix: "/api/interactions" });
-    fastify.register(notificationRoutes, { prefix: "/api/notifications" });
-    fastify.register(adminRoutes, { prefix: "/api/admin" });
-    fastify.register(specRoutes, { prefix: "/api/specifications" });
+    fastify.register(userRoutes, { prefix: "/users" });
+    fastify.register(publiRoutes, { prefix: "/publications" });
+    fastify.register(interactionRoutes, { prefix: "/interactions" });
+    fastify.register(notificationRoutes, { prefix: "/notifications" });
+    fastify.register(adminRoutes, { prefix: "/admin" });
+    fastify.register(specRoutes, { prefix: "/specifications" });
 
     const address = await fastify.listen({
       port: config.PORT,
