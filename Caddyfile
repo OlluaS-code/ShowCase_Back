@@ -1,8 +1,0 @@
-:80 {
-    # Forward all API requests to the Fastify Backend
-    reverse_proxy /api/* backend:3000
-
-    # Custom handling for Tarpit (Conceptual proxy, requires caddy-defender plugin for real tarpitting)
-    # The Fastify app will return X-Action-Tarpit: true
-    # For now, it passes through as a standard 429 response.
-}
