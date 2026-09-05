@@ -84,10 +84,12 @@ export class NotificationService {
       let actionLink: string | undefined;
       let actionText = "Ver Publicação";
 
+      const baseUrl = config.APP_FRONTEND_URL.replace(/\/+$/, "");
+
       if (type === NotificationType.NEW_PUBLICATION && data && (data as any).pubId) {
-        actionLink = `${config.APP_FRONTEND_URL}/#/?open=${(data as any).pubId}`; 
+        actionLink = `${baseUrl}/#/?open=${(data as any).pubId}`; 
       } else if (type === NotificationType.NEW_SPECIFICATION) {
-        actionLink = `${config.APP_FRONTEND_URL}/#/`; 
+        actionLink = `${baseUrl}/#/`; 
         actionText = "Ver Nova Especialidade";
       }
 
